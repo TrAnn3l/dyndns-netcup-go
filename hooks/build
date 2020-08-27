@@ -1,5 +1,6 @@
 #!/bin/bash
 
+docker run --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
 docker buildx create --name mybuilder
 docker buildx use mybuilder
 docker buildx build --platform=linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/arm/v6 -t $IMAGE_NAME . --push
