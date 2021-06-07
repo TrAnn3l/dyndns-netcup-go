@@ -1,179 +1,209 @@
 package netcup
 
 import (
-    "log"
-    "bytes"
-    "encoding/json"
-    "net/http"
-    "io/ioutil"
-    "strconv"
-    "errors"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"strconv"
 )
 
 const (
-    url = "https://ccp.netcup.net/run/webservice/servers/endpoint.php?JSON"
+	url = "https://ccp.netcup.net/run/webservice/servers/endpoint.php?JSON"
 )
 
 var (
-    ErrNoApiSessionid = errors.New("netcup: There is no ApiSessionId. Are you logged in?")
+	// ErrNoAPISessionid indicates that there is no session id available. This means that
+	// you are probably not logged in.
+	ErrNoAPISessionid = errors.New("netcup: There is no ApiSessionId. Are you logged in?")
 
-    verbose = false
+	verbose = false
 )
 
+// Client represents a client to the netcup api.
 type Client struct {
-    client *http.Client
-    Customernumber int
-    ApiKey string
-    ApiPassword string
-    ApiSessionid string
+	client         *http.Client
+	Customernumber int
+	APIKey         string
+	APIPassword    string
+	APISessionid   string
 }
 
+// NewClient returns a new client by customernumber, apikey and apipassword
 func NewClient(customernumber int, apikey, apipassword string) *Client {
-    return &Client{
-        Customernumber: customernumber,
-        ApiKey: apikey,
-        ApiPassword: apipassword,
-        client: http.DefaultClient,
-    }
+	return &Client{
+		Customernumber: customernumber,
+		APIKey:         apikey,
+		APIPassword:    apipassword,
+		client:         http.DefaultClient,
+	}
 }
 
 func (c *Client) do(req *Request) (*Response, error) {
-    b, err := json.Marshal(req)
-    if err != nil {
-        return nil, err
-    }
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
 
-    resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(b))
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
+	resp, err := c.client.Post(url, "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return nil, err
-    }
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 
-    var response Response
-    err = json.Unmarshal(body, &response)
-    if err != nil {
-        return nil, err
-    }
+	var response Response
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return nil, err
+	}
 
-    if !response.isSuccess() {
-        return nil, errors.New(response.getFormattedError())
-    }
+	if !response.isSuccess() {
+		return nil, errors.New(response.getFormattedError())
+	}
 
-    logInfo(response.getFormattedStatus())
+	logInfo(response.getFormattedStatus())
 
-    return &response, nil
+	return &response, nil
 }
 
+// Login logs the client in the netcup api. This method should be issued before
+// any other method.
 func (c *Client) Login() error {
-    var params = NewParams()
-    params.AddParam("apikey", c.ApiKey)
-    params.AddParam("apipassword", c.ApiPassword)
-    params.AddParam("customernumber", strconv.Itoa(c.Customernumber))
+	var params = NewParams()
+	params.AddParam("apikey", c.APIKey)
+	params.AddParam("apipassword", c.APIPassword)
+	params.AddParam("customernumber", strconv.Itoa(c.Customernumber))
 
-    request := NewRequest("login", &params)
+	request := NewRequest("login", &params)
 
-    response, err := c.do(request)
-    if err != nil {
-        return err
-    }
+	response, err := c.do(request)
+	if err != nil {
+		return err
+	}
 
-    var loginResponse LoginResponse
-    err = json.Unmarshal(response.ResponseData, &loginResponse)
-    if err != nil {
-        return err
-    } else if loginResponse.ApiSessionid == "" {
-        return errors.New("netcup: empty sessionid supplied")
-    } else {
-        c.ApiSessionid = loginResponse.ApiSessionid
-    }
+	var loginResponse LoginResponse
+	err = json.Unmarshal(response.ResponseData, &loginResponse)
+	if err != nil {
+		return err
+	} else if loginResponse.APISessionid == "" {
+		return errors.New("netcup: empty sessionid supplied")
+	} else {
+		c.APISessionid = loginResponse.APISessionid
+	}
 
-
-    return nil
+	return nil
 }
 
-func (c *Client) InfoDnsZone(domainname string) (error, *DNSZone) {
-    params := c.basicAuthParams(domainname)
-    request := NewRequest("infoDnsZone", params)
+// InfoDNSZone return the DNSZone for a specified domain
+func (c *Client) InfoDNSZone(domainname string) (*DNSZone, error) {
+	params, err := c.basicAuthParams(domainname)
+	if err != nil {
+		return nil, err
+	}
 
-    response, err := c.do(request)
-    if err != nil {
-        return err, nil
-    }
+	request := NewRequest("infoDnsZone", params)
 
-    var dnsZone DNSZone
-    err = json.Unmarshal(response.ResponseData, &dnsZone)
-    if err != nil {
-        return err, nil
-    }
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
 
-    return nil, &dnsZone
+	var dnsZone DNSZone
+	err = json.Unmarshal(response.ResponseData, &dnsZone)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dnsZone, nil
 }
 
-func (c *Client) InfoDnsRecords(domainname string) (error, *DNSRecordSet) {
-    params := c.basicAuthParams(domainname)
-    request := NewRequest("infoDnsRecords", params)
+// InfoDNSRecords returns a DNSRecordSet for a specified domain
+func (c *Client) InfoDNSRecords(domainname string) (*DNSRecordSet, error) {
+	params, err := c.basicAuthParams(domainname)
+	if err != nil {
+		return nil, err
+	}
 
-    response, err := c.do(request)
-    if err != nil {
-        return err, nil
-    }
+	request := NewRequest("infoDnsRecords", params)
 
-    var dnsRecordSet DNSRecordSet
-    err = json.Unmarshal(response.ResponseData, &dnsRecordSet)
-    if err != nil {
-        return err, nil
-    }
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
 
-    return nil, &dnsRecordSet
+	var dnsRecordSet DNSRecordSet
+	err = json.Unmarshal(response.ResponseData, &dnsRecordSet)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dnsRecordSet, nil
 }
 
-func (c *Client) UpdateDnsZone(domainname string, dnszone *DNSZone) error {
-    params := c.basicAuthParams(domainname)
-    params.AddParam("dnszone", dnszone)
-    request := NewRequest("updateDnsZone", params)
+// UpdateDNSZone updates the specified domain with a specified DNSZone
+func (c *Client) UpdateDNSZone(domainname string, dnszone *DNSZone) error {
+	params, err := c.basicAuthParams(domainname)
+	if err != nil {
+		return err
+	}
+	params.AddParam("dnszone", dnszone)
+	request := NewRequest("updateDnsZone", params)
 
-    _, err := c.do(request)
-    if err != nil {
-        return err
-    }
+	_, err = c.do(request)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
-func (c *Client) UpdateDnsRecords(domainname string, dnsRecordSet *DNSRecordSet) error {
-    params := c.basicAuthParams(domainname)
-    params.AddParam("dnsrecordset", dnsRecordSet)
-    request := NewRequest("updateDnsRecords", params)
+// UpdateDNSRecords updates the specified domain with a specified DNSRecordSet
+func (c *Client) UpdateDNSRecords(domainname string, dnsRecordSet *DNSRecordSet) error {
+	params, err := c.basicAuthParams(domainname)
+	if err != nil {
+		return err
+	}
 
-    _, err := c.do(request)
-    if err != nil {
-        return err
-    }
+	params.AddParam("dnsrecordset", dnsRecordSet)
+	request := NewRequest("updateDnsRecords", params)
 
-    return nil
+	_, err = c.do(request)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (c *Client) basicAuthParams(domainname string) *Params {
-    params := NewParams()
-    params.AddParam("apikey", c.ApiKey)
-    params.AddParam("apisessionid", c.ApiSessionid)
-    params.AddParam("customernumber", strconv.Itoa(c.Customernumber))
-    params.AddParam("domainname", domainname)
+func (c *Client) basicAuthParams(domainname string) (*Params, error) {
+	if c.APISessionid == "" {
+		return nil, ErrNoAPISessionid
+	}
 
-    return &params
+	params := NewParams()
+	params.AddParam("apikey", c.APIKey)
+	params.AddParam("apisessionid", c.APISessionid)
+	params.AddParam("customernumber", strconv.Itoa(c.Customernumber))
+	params.AddParam("domainname", domainname)
+
+	return &params, nil
 }
 
+// SetVerbose sets the verboseness of the output. If set to true the response to every
+// request will be send to stdout.
 func SetVerbose(isVerbose bool) {
-    verbose = isVerbose
+	verbose = isVerbose
 }
 
 func logInfo(msg string, v ...interface{}) {
-    if verbose {
-        log.Printf(msg, v...)
-    }
+	if verbose {
+		log.Printf(msg, v...)
+	}
 }
