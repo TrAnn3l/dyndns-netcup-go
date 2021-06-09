@@ -9,7 +9,7 @@ related to netcup GmbH. It is **heavily** inspired by
 [this](https://github.com/stecklars/dynamic-dns-netcup-api) 
 project which might be also a good solution for your 
 dynamic dns needs. 
-
+ 
 ## Table of Contents
 <!-- vim-markdown-toc GFM -->
 
