@@ -1,4 +1,4 @@
-module github.com/Hentra/dyndns-netcup-go
+module github.com/TrAnn3l/dyndns-netcup-go
 
 go 1.16
 

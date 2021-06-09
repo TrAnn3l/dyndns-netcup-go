@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/Hentra/dyndns-netcup-go/netcup"
+	"github.com/TrAnn3l/dyndns-netcup-go/netcup"
 	"log"
 	"strconv"
 	"time"
