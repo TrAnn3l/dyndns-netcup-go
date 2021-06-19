@@ -37,5 +37,5 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/arm/v6
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/dyndns-netcup-go:latest
-            ghcr.io/${{ github.actor }}/dyndns-netcup-go:latest
+            trann3l/dyndns-netcup-go:latest
+            ghcr.io/trann3l/dyndns-netcup-go:latest
